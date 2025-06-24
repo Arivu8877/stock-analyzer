@@ -1,31 +1,17 @@
-# Stock Analyzer Script - Alpha Vantage API
+# Stock Analyzer - Shell Script Version
 
-This script fetches stock market data using the [Alpha Vantage API](https://www.alphavantage.co/documentation/), identifies the top gainer and loser of the day from a sample list of stock symbols, and displays key information such as:
+This branch contains a Bash shell script that uses the Alpha Vantage API to fetch and display stock information (Top Gainer and Loser).
 
-- Company Description
-- Today's % Change
-- Current Price
-- Last Month’s Closing Price
+## Files
+- `stockscript.sh` – Bash script to fetch stock data using `curl` and `jq`
+- `README.md` – This file
 
----
+## Requirements
+- `curl`
+- `jq` (install via `sudo apt install jq` or `brew install jq`)
 
-## 📦 Features
-
-- Uses free Alpha Vantage API endpoints
-- Calculates % change between today's and yesterday's price
-- Retrieves company descriptions
-- Displays last month's closing price
-
----
-
-## 🧰 Requirements
-
-- Python 3.7 or above
-- `requests` library
-- `pandas` library
-
-Install dependencies using:
-
+## How to Run
 ```bash
-pip install -r requirements.txt
+chmod +x stockscript.sh
+./stockscript.sh
 

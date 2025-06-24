@@ -12,7 +12,7 @@ DATES=($(echo "$DAILY_DATA" | jq -r '.["Time Series (Daily)"] | keys_unsorted[]'
 TODAY=${DATES[0]}
 YESTERDAY=${DATES[1]}
 
-TODAY_PRICE=$(echo "$DAILY_DATA" | jq -r --arg date "$TODAY" '.["Time Series (Daily")][$date]["4. close"]')
+TODAY_PRICE=$(echo "$DAILY_DATA" | jq -r --arg date "$TODAY" '.["Time Series (Daily)"][$date]["4. close"]')
 YESTERDAY_PRICE=$(echo "$DAILY_DATA" | jq -r --arg date "$YESTERDAY" '.["Time Series (Daily)"][$date]["4. close"]')
 
 # Calculate last month's date
@@ -40,4 +40,3 @@ echo "Description: \"$DESCRIPTION\""
 echo "Percentage Loss Today: $PERCENT_CHANGE%"
 echo "Current Price: $TODAY_PRICE"
 echo "Last Month's Closing Price: $LAST_MONTH_PRICE"
-
