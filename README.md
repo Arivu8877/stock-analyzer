@@ -27,5 +27,22 @@ This script fetches stock market data using the [Alpha Vantage API](https://www.
 Install dependencies using:
 
 ```bash
+
 pip install -r requirements.txt
 
+
+## How to Run
+--------------
+
+python stockscript.py
+
+----------------------------------------------------------------------------------------------------------------------
+Note :
+
+By default, the script uses the demo API key, which only supports IBM.
+
+To fetch real data from multiple tickers like AAPL or MSFT, replace the demo key with your actual API key in the script:
+
+API_KEY = 'your_actual_api_key_here'
+
+------------------------------------------------------------------------------------------------------------------------
