@@ -1,42 +1,94 @@
 #!/bin/bash
 
-API_KEY="demo"
-TICKER="IBM"
+API_KEY="CEE6143GG6X7D117"
+TICKERS=("AAPL" "IBM" "MSFT")
+TMP_FILE="stock_data.json"
+LAST_MONTH_DATE=$(date -d "$(date +%Y-%m-01) -1 day" +%Y-%m-%d)
 
-# Get today's and previous prices
-DAILY_URL="https://www.alphavantage.co/query?function=TIME_SERIES_DAILY_ADJUSTED&symbol=$TICKER&apikey=$API_KEY"
-DAILY_DATA=$(curl -s "$DAILY_URL")
+declare -A SYMBOL_CHANGE
+declare -A SYMBOL_TODAY
+declare -A SYMBOL_LAST_MONTH
 
-# Use jq to get the latest two dates
-DATES=($(echo "$DAILY_DATA" | jq -r '.["Time Series (Daily)"] | keys_unsorted[]' | sort -r | head -n 2))
-TODAY=${DATES[0]}
-YESTERDAY=${DATES[1]}
+for SYMBOL in "${TICKERS[@]}"; do
+    echo "Fetching data for $SYMBOL..."
 
-TODAY_PRICE=$(echo "$DAILY_DATA" | jq -r --arg date "$TODAY" '.["Time Series (Daily)"][$date]["4. close"]')
-YESTERDAY_PRICE=$(echo "$DAILY_DATA" | jq -r --arg date "$YESTERDAY" '.["Time Series (Daily)"][$date]["4. close"]')
+    # Fetch TIME_SERIES_DAILY data
+    curl -s "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${SYMBOL}&apikey=${API_KEY}" > "$TMP_FILE"
+    
+    # Extract date keys and sort descending
+    DATES=($(jq -r '.["Time Series (Daily)"] | keys_unsorted[]' "$TMP_FILE" | sort -r))
+    
+    if [[ ${#DATES[@]} -lt 2 ]]; then
+        echo "Not enough data for $SYMBOL"
+        continue
+    fi
 
-# Calculate last month's date
-LAST_MONTH=$(date --date="$(date +%Y-%m-01) -1 day" +%Y-%m-%d)
-LAST_MONTH_PRICE=$(echo "$DAILY_DATA" | jq -r --arg date "$LAST_MONTH" '.["Time Series (Daily)"][$date]["4. close"] // "N/A"')
+    TODAY_DATE="${DATES[0]}"
+    YESTERDAY_DATE="${DATES[1]}"
+    
+    TODAY_CLOSE=$(jq -r ".\"Time Series (Daily)\"[\"$TODAY_DATE\"][\"4. close\"]" "$TMP_FILE")
+    YESTERDAY_CLOSE=$(jq -r ".\"Time Series (Daily)\"[\"$YESTERDAY_DATE\"][\"4. close\"]" "$TMP_FILE")
+    LAST_MONTH_CLOSE=$(jq -r ".\"Time Series (Daily)\"[\"$LAST_MONTH_DATE\"][\"4. close\"] // \"N/A\"" "$TMP_FILE")
 
-# Calculate percentage change
-PERCENT_CHANGE=$(awk "BEGIN { pc=($TODAY_PRICE - $YESTERDAY_PRICE)/$YESTERDAY_PRICE*100; printf \"%.2f\", pc }")
+    if [[ $TODAY_CLOSE == "null" || $YESTERDAY_CLOSE == "null" ]]; then
+        echo "Missing close prices for $SYMBOL"
+        continue
+    fi
 
-# Get company overview
-OVERVIEW_URL="https://www.alphavantage.co/query?function=OVERVIEW&symbol=$TICKER&apikey=$API_KEY"
-OVERVIEW=$(curl -s "$OVERVIEW_URL")
-DESCRIPTION=$(echo "$OVERVIEW" | jq -r '.Description')
+    # Calculate percent change
+    CHANGE=$(awk "BEGIN {printf \"%.2f\", (($TODAY_CLOSE - $YESTERDAY_CLOSE) / $YESTERDAY_CLOSE) * 100}")
 
-# Output
-echo "Top Gainer of the Day = \"$TICKER\""
-echo "Description: \"$DESCRIPTION\""
-echo "Percentage Gain Today: $PERCENT_CHANGE%"
-echo "Current Price: $TODAY_PRICE"
-echo "Last Month's Closing Price: $LAST_MONTH_PRICE"
+    SYMBOL_CHANGE[$SYMBOL]=$CHANGE
+    SYMBOL_TODAY[$SYMBOL]=$TODAY_CLOSE
+    SYMBOL_LAST_MONTH[$SYMBOL]=$LAST_MONTH_CLOSE
+done
 
-echo ""
-echo "Top Loser of the Day = \"$TICKER\""
-echo "Description: \"$DESCRIPTION\""
-echo "Percentage Loss Today: $PERCENT_CHANGE%"
-echo "Current Price: $TODAY_PRICE"
-echo "Last Month's Closing Price: $LAST_MONTH_PRICE"
+# Find top gainer and loser
+TOP_GAINER=""
+TOP_LOSER=""
+MAX_CHANGE=-1000
+MIN_CHANGE=1000
+
+for SYMBOL in "${!SYMBOL_CHANGE[@]}"; do
+    CHANGE=${SYMBOL_CHANGE[$SYMBOL]}
+    if (( $(echo "$CHANGE > $MAX_CHANGE" | bc -l) )); then
+        MAX_CHANGE=$CHANGE
+        TOP_GAINER=$SYMBOL
+    fi
+    if (( $(echo "$CHANGE < $MIN_CHANGE" | bc -l) )); then
+        MIN_CHANGE=$CHANGE
+        TOP_LOSER=$SYMBOL
+    fi
+done
+
+print_details() {
+    LABEL=$1
+    SYMBOL=$2
+    CHANGE=${SYMBOL_CHANGE[$SYMBOL]}
+    TODAY=${SYMBOL_TODAY[$SYMBOL]}
+    LAST_MONTH=${SYMBOL_LAST_MONTH[$SYMBOL]}
+
+    echo
+    echo "$LABEL of the Day: $SYMBOL"
+    
+    # Fetch company overview
+    DESCRIPTION=$(curl -s "https://www.alphavantage.co/query?function=OVERVIEW&symbol=${SYMBOL}&apikey=${API_KEY}" | jq -r '.Description // "Description not available"')
+    
+    echo "Description: $DESCRIPTION"
+    echo "Percentage Change Today: $CHANGE%"
+    echo "Current Price: $TODAY"
+    echo "Last Month's Closing Price: $LAST_MONTH"
+}
+
+# Print Results
+if [[ -n $TOP_GAINER ]]; then
+    print_details "Top Gainer" "$TOP_GAINER"
+fi
+
+if [[ -n $TOP_LOSER ]]; then
+    print_details "Top Loser" "$TOP_LOSER"
+fi
+
+# Cleanup
+rm -f "$TMP_FILE"
+
